@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Min Liste">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3737/3737372.png">
+
+    <title>Smart Handle- og Fryseapp</title>
+    
+    <style>
+        :root {
+            --ios-blue: #007aff;
+            --ios-bg: #f2f2f7;
+            --ios-card: #ffffff;
+            --ios-text: #000000;
+            --ios-secondary-text: #8e8e93;
+            --ios-red: #ff3b30;
+            --ios-divider: #d1d1d6;
+        }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background-color: var(--ios-bg); 
+            margin: 0; 
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh; 
+            overflow: hidden;
+            color: var(--ios-text);
+        }
+
+        /* Header & Safe Areas */
+        header { 
+            background: var(--ios-card); 
+            padding-top: env(safe-area-inset-top, 20px);
+            padding-left: 20px;
+            padding-right: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--ios-divider); 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            flex-shrink: 0;
+            z-index: 10;
+        }
+
+        .top-controls { 
+            background: var(--ios-card); 
+            padding: 10px 16px; 
+            border-bottom: 1px solid var(--ios-divider); 
+            display: flex; 
+            flex-direction: column; 
+            gap: 10px; 
+            flex-shrink: 0; 
+        }
+
+        .input-group { display: flex; gap: 8px; }
+
+        input { 
+            flex: 1; 
+            padding: 12px; 
+            border-radius: 10px; 
+            border: none; 
+            background: #e5e5ea; 
+            font-size: 16px; /* Hindrer auto-zoom på iOS */
+            box-sizing: border-box; 
+            outline: none;
+        }
+
+        .add-btn { 
+            background: var(--ios-blue); 
+            color: white; 
+            border: none; 
+            border-radius: 10px; 
+            padding: 0 18px; 
+            font-weight: 600; 
+            cursor: pointer;
+        }
+
+        .add-btn:active { opacity: 0.6; }
+
+        /* Hovedinnhold */
+        main { 
+            flex: 1; 
+            overflow-y: auto; 
+            padding: 16px; 
+            -webkit-overflow-scrolling: touch; 
+        }
+
+        h2 { 
+            font-size: 13px; 
+            color: var(--ios-secondary-text); 
+            text-transform: uppercase; 
+            letter-spacing: 0.5px; 
+            margin: 15px 0 8px 5px; 
+        }
+
+        .list-container { 
+            background: var(--ios-card); 
+            border-radius: 10px; 
+            overflow: hidden; 
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05); 
+            margin-bottom: 20px;
+        }
+
+        .item { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 14px 16px; 
+            border-bottom: 0.5px solid var(--ios-divider); 
+            cursor: pointer; 
+            background: var(--ios-card);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .item:active { background-color: #e5e5ea; }
+        .item:last-child { border-bottom: none; }
+
+        .item-active { color: var(--ios-blue); font-weight: 500; }
+
+        /* Navigasjon */
+        nav { 
+            background: #f9f9f9f2; 
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            display: flex; 
+            justify-content: space-around; 
+            padding-top: 10px;
+            padding-bottom: env(safe-area-inset-bottom, 20px);
+            border-top: 1px solid var(--ios-divider); 
+            flex-shrink: 0; 
+        }
+
+        .nav-btn { 
+            border: none; 
+            background: none; 
+            font-size: 10px; 
+            color: var(--ios-secondary-text); 
+            cursor: pointer; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            gap: 4px; 
+            flex: 1; 
+        }
+
+        .nav-btn.active { color: var(--ios-blue); font-weight: bold; }
+        .nav-icon { font-size: 24px; }
+
+        /* Admin Panel / Import */
+        #admin-panel { 
+            position: fixed; bottom: -100%; left: 0; width: 100%; height: 85%; 
+            background: var(--ios-bg); transition: 0.4s cubic-bezier(0.1, 0.7, 0.1, 1); 
+            padding: 20px; box-sizing: border-box; z-index: 100; 
+            border-top: 1px solid var(--ios-divider); border-radius: 15px 15px 0 0; 
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.15);
+            display: flex; flex-direction: column;
+        }
+        #admin-panel.open { bottom: 0; }
+        
+        textarea { 
+            width: 100%; flex: 1; 
+            margin-bottom: 20px; padding: 15px; border: none; 
+            border-radius: 12px; font-size: 16px; box-sizing: border-box; 
+            resize: none; outline: none;
+            background: var(--ios-card);
+        }
+
+        .btn-group { flex-shrink: 0; }
+        .btn { padding: 16px; border-radius: 12px; border: none; width: 100%; margin-bottom: 12px; font-weight: 600; font-size: 17px; cursor: pointer; }
+        .vask-btn { background: var(--ios-blue); color: white; }
+        .lukk-btn { background: #e5e5ea; color: var(--ios-text); }
+        .danger-btn { color: var(--ios-red); background: none; font-size: 14px; margin-top: 5px; width: 100%; border: none; cursor: pointer;}
+    </style>
+</head>
+<body>
+
+<header>
+    <h1 id="title" style="margin:0; font-size: 22px; font-weight: 700;">Handling 🛒</h1>
+    <div onclick="toggleAdmin()" style="font-size: 24px; cursor: pointer; color: var(--ios-blue);">⚙️</div>
+</header>
+
+<div class="top-controls">
+    <div class="input-group">
+        <input type="text" id="newItemInput" placeholder="Skriv inn ny vare..." onkeypress="handleKeyPress(event)" inputmode="text">
+        <button class="add-btn" onclick="leggTilNyVare()">Legg til</button>
+    </div>
+    <input type="text" id="searchInput" placeholder="Søk i bibliotek..." onkeyup="render()" inputmode="search">
+</div>
+
+<main>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2>Aktiv liste</h2>
+        <button onclick="clearActiveList()" style="background:none; border:none; color:var(--ios-red); font-size: 12px; padding-top: 10px; cursor:pointer;">Tøm fane</button>
+    </div>
+    <div id="activeList" class="list-container"></div>
+    
+    <h2>Vareutvalg</h2>
+    <div id="libraryList" class="list-container"></div>
+</main>
+
+<nav>
+    <button id="btn-handling" class="nav-btn active" onclick="switchTab('handling')">
+        <span class="nav-icon">🛒</span><span>Handling</span>
+    </button>
+    <button id="btn-frys" class="nav-btn" onclick="switchTab('frys')">
+        <span class="nav-icon">❄️</span><span>Frys</span>
+    </button>
+    <button id="btn-kontor" class="nav-btn" onclick="switchTab('kontor')">
+        <span class="nav-icon">📎</span><span>Kontor</span>
+    </button>
+</nav>
+
+<div id="admin-panel">
+    <h3 style="margin-top:0">Bibliotek-instillinger</h3>
+    <p style="color: var(--ios-secondary-text); font-size: 14px; margin-bottom: 15px;">Lim inn vareliste (én per linje):</p>
+    <textarea id="importArea" placeholder="Kyllingbryst&#10;Melk&#10;Brød"></textarea>
+    <div class="btn-group">
+        <button class="btn vask-btn" onclick="importerListe()">Oppdater Bibliotek</button>
+        <button class="btn lukk-btn" onclick="toggleAdmin()">Lukk</button>
+        <button class="danger-btn" onclick="deleteFullDatabase()">Slett alt innhold og start på nytt</button>
+    </div>
+</div>
+
+<script>
+    // --- DATA OG LAGRING ---
+    let currentTab = 'handling';
+    let database = JSON.parse(localStorage.getItem('sh_database')) || { hjem: [], kontor: [] };
+    let activeItems = JSON.parse(localStorage.getItem('sh_active')) || { handling: [], frys: [], kontor: [] };
+
+    function saveData() {
+        localStorage.setItem('sh_database', JSON.stringify(database));
+        localStorage.setItem('sh_active', JSON.stringify(activeItems));
+    }
+
+    // --- NAVIGASJON ---
+    function switchTab(tab) {
+        currentTab = tab;
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('btn-' + tab).classList.add('active');
+        
+        const emojis = { handling: '🛒', frys: '❄️', kontor: '📎' };
+        const titles = { handling: 'Handling', frys: 'Frys', kontor: 'Kontor' };
+        document.getElementById('title').innerText = `${titles[tab]} ${emojis[tab]}`;
+        
+        render();
+    }
+
+    function toggleAdmin() { 
+        const panel = document.getElementById('admin-panel');
+        panel.classList.toggle('open'); 
+        if(panel.classList.contains('open')) {
+            const dbKey = (currentTab === 'kontor') ? 'kontor' : 'hjem';
+            document.getElementById('importArea').value = database[dbKey].map(v => v.navn).join('\n');
+        }
+    }
+
+    // --- LOGIKK ---
+    function handleKeyPress(e) {
+        if (e.key === 'Enter') {
+            leggTilNyVare();
+            document.activeElement.blur(); // Lukk tastatur
+        }
+    }
+
+    function leggTilNyVare() {
+        const input = document.getElementById('newItemInput');
+        const navn = input.value.trim();
+        if (navn === "") return;
+
+        const dbKey = (currentTab === 'kontor') ? 'kontor' : 'hjem';
+        
+        // 1. Legg til i database hvis ny
+        if (!database[dbKey].some(v => v.navn.toLowerCase() === navn.toLowerCase())) {
+            database[dbKey].push({ navn: navn });
+            database[dbKey].sort((a, b) => a.navn.localeCompare(b.navn, 'nb'));
+        }
+
+        // 2. Legg til i aktiv liste i denne fanen
+        if (!activeItems[currentTab].some(v => v.navn.toLowerCase() === navn.toLowerCase())) {
+            activeItems[currentTab].push({ navn: navn });
+        }
+
+        input.value = "";
+        saveData();
+        render();
+    }
+
+    function importerListe() {
+        const input = document.getElementById('importArea').value;
+        const lines = input.split('\n').filter(l => l.trim() !== "");
+        const newItems = lines.map(l => ({ navn: l.trim() }));
+        const dbKey = (currentTab === 'kontor') ? 'kontor' : 'hjem';
+
+        database[dbKey] = newItems;
+        database[dbKey].sort((a, b) => a.navn.localeCompare(b.navn, 'nb'));
+
+        saveData();
+        toggleAdmin();
+        render();
+    }
+
+    function addToActive(navn) {
+        activeItems[currentTab].push({ navn: navn });
+        saveData();
+        render();
+    }
+
+    function removeFromActive(index) {
+        activeItems[currentTab].splice(index, 1);
+        saveData();
+        render();
+    }
+
+    function clearActiveList() {
+        if(confirm("Vil du tømme listen i denne fanen?")) {
+            activeItems[currentTab] = [];
+            saveData();
+            render();
+        }
+    }
+
+    function deleteFullDatabase() {
+        if(confirm("Dette sletter absolutt alt i alle faner. Er du sikker?")) {
+            localStorage.clear();
+            location.reload();
+        }
+    }
+
+    // --- VISNING ---
+    function render() {
+        const activeDiv = document.getElementById('activeList');
+        const libraryDiv = document.getElementById('libraryList');
+        const search = document.getElementById('searchInput').value.toLowerCase();
+        
+        const db = (currentTab === 'kontor') ? database.kontor : database.hjem;
+        const currentActive = activeItems[currentTab];
+
+        // Tegn Aktive varer
+        activeDiv.innerHTML = currentActive.length ? currentActive.map((v, i) => `
+            <div class="item item-active" onclick="removeFromActive(${i})">
+                <span>🔵 ${v.navn}</span>
+                <span style="color: var(--ios-red); font-size: 11px; font-weight: 700;">FJERN</span>
+            </div>
+        `).join('') : '<div style="padding:20px; color:#8e8e93; font-size:14px; text-align:center;">Listen er tom</div>';
+
+        // Tegn Bibliotek (filtrert for søk og hva som er aktivt i DENNE fanen)
+        const filteredLibrary = db.filter(v => {
+            const matchesSearch = v.navn.toLowerCase().includes(search);
+            const isAlreadyInTab = currentActive.some(active => active.navn === v.navn);
+            return matchesSearch && !isAlreadyInTab;
+        });
+
+        libraryDiv.innerHTML = filteredLibrary.length ? filteredLibrary.map(v => `
+            <div class="item" onclick="addToActive('${v.navn.replace(/'/g, "\\'")}')">
+                <span>⚪️ ${v.navn}</span>
+                <span style="color: var(--ios-blue); font-size: 18px; font-weight: bold;">+</span>
+            </div>
+        `).join('') : '<div style="padding:20px; color:#8e8e93; font-size:14px; text-align:center;">Ingen flere varer funnet</div>';
+    }
+
+    // Oppstart
+    render();
+</script>
+
+</body>
+</html>
