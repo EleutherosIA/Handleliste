@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-title" content="Min Liste">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3737/3737372.png">
 
-    <title>Kompakt Handleliste - Smart Sortering</title>
+    <title>Smart Handleliste - Long Press Edit</title>
     
     <style>
         /* Fargetemaer */
@@ -23,6 +23,7 @@
             --red: #d9534f;
             --divider: #e8e4d9;
             --input-bg: #f0ede4;
+            --overlay: rgba(0,0,0,0.4);
         }
 
         [data-theme="dark"] {
@@ -34,6 +35,7 @@
             --red: #ff5e57;
             --divider: #3d3d3d;
             --input-bg: #3d3d3d;
+            --overlay: rgba(0,0,0,0.6);
         }
 
         [data-theme="pink"] {
@@ -45,6 +47,7 @@
             --red: #ff4d6d;
             --divider: #f8d7da;
             --input-bg: #ffe4ed;
+            --overlay: rgba(80,0,40,0.3);
         }
 
         body { 
@@ -66,6 +69,7 @@
             border-bottom: 1px solid var(--divider); 
             display: flex; justify-content: space-between; align-items: center; 
             flex-shrink: 0;
+            z-index: 30;
         }
 
         .top-controls { 
@@ -73,6 +77,7 @@
             padding: 10px 12px; 
             border-bottom: 1px solid var(--divider); 
             display: flex; flex-direction: column; gap: 8px; 
+            z-index: 30;
         }
 
         .input-group { display: flex; gap: 6px; position: relative; }
@@ -113,7 +118,13 @@
             border-radius: 12px; padding: 0 15px; font-weight: 600; font-size: 13px;
         }
 
-        main { flex: 1; overflow-y: auto; padding: 12px; -webkit-overflow-scrolling: touch; }
+        main { 
+            flex: 1; 
+            overflow-y: auto; 
+            padding: 12px; 
+            -webkit-overflow-scrolling: touch; 
+            padding-bottom: 100px; 
+        }
 
         h2 { 
             font-size: 11px; color: var(--secondary-text); text-transform: uppercase; 
@@ -134,17 +145,47 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.04); margin-bottom: 15px;
         }
 
-        .item { 
-            display: flex; justify-content: space-between; align-items: center; 
-            padding: 12px; background: var(--card); font-size: 14px;
+        .swipe-container {
+            position: relative;
+            background-color: var(--red);
+            overflow: hidden;
+            user-select: none;
+            touch-action: pan-y;
+            border-bottom: 0.5px solid var(--divider);
         }
 
-        #activeList .item { border-bottom: 0.5px solid var(--divider); cursor: pointer; }
-        .item:active { background-color: var(--input-bg); }
+        .swipe-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: var(--card);
+            font-size: 14px;
+            position: relative;
+            z-index: 2;
+            transition: transform 0.2s ease-out;
+        }
+
+        .delete-btn-ios {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 80px;
+            background-color: var(--red);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 800;
+            z-index: 1;
+        }
+
         .item-active { color: var(--primary); font-weight: 600; }
 
         .qty-input {
-            width: 75px; /* Litt bredere for tekst som "500g" */
+            width: 75px;
             padding: 6px 4px;
             border-radius: 8px;
             border: 1px solid var(--divider);
@@ -162,9 +203,18 @@
         }
 
         nav { 
-            background: var(--card); border-top: 1px solid var(--divider); 
-            display: flex; justify-content: space-around; 
-            padding-bottom: env(safe-area-inset-bottom, 15px); padding-top: 10px;
+            background: var(--card); 
+            border-top: 1px solid var(--divider); 
+            display: flex; 
+            justify-content: space-around; 
+            padding-bottom: env(safe-area-inset-bottom, 15px); 
+            padding-top: 10px;
+            z-index: 40;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
         }
 
         .nav-btn { 
@@ -174,6 +224,37 @@
 
         .nav-btn.active { color: var(--primary); font-weight: bold; }
         .nav-icon { font-size: 20px; }
+
+        /* Dialoger / Modaler */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--overlay);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            backdrop-filter: blur(2px);
+        }
+
+        .modal-content {
+            background: var(--card);
+            padding: 20px;
+            border-radius: 20px;
+            width: 80%;
+            max-width: 300px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .cat-option {
+            padding: 12px;
+            border-bottom: 1px solid var(--divider);
+            font-size: 14px;
+            text-align: center;
+            cursor: pointer;
+        }
+        .cat-option:last-child { border-bottom: none; }
+        .cat-option:active { background: var(--input-bg); }
 
         #admin-panel { 
             position: fixed; bottom: -100%; left: 0; width: 100%; height: 85%; 
@@ -221,16 +302,25 @@
     </div>
 </div>
 
-<main>
+<main id="main-content">
     <div style="display: flex; justify-content: space-between; align-items: center;">
         <h2 id="active-list-header">Dette skal vi ha</h2>
         <button onclick="clearActiveList()" style="background:none; border:none; color:var(--red); font-size: 10px; cursor:pointer;">Tøm fane</button>
     </div>
     <div id="activeList" class="list-container"></div>
     
-    <h2>Velg fra biblioteket</h2>
+    <h2>Bibliotek (hold inne for kategori)</h2>
     <div id="libraryList" class="list-container"></div>
 </main>
+
+<!-- Kategorivelger Modal -->
+<div id="catModal" class="modal-overlay" onclick="closeCatModal()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <h3 style="margin-top:0; font-size: 16px; text-align: center;">Velg kategori</h3>
+        <div id="modalCatList"></div>
+        <button class="btn lukk-btn" style="margin-top:10px; padding:10px;" onclick="closeCatModal()">Avbryt</button>
+    </div>
+</div>
 
 <nav>
     <button id="btn-handling" class="nav-btn active" onclick="switchTab('handling')">
@@ -255,8 +345,7 @@
         <div style="width: 40px; height: 40px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer; background: #d63384;" onclick="setTheme('pink')"></div>
     </div>
 
-    <h3 style="font-size: 18px;">Rediger bibliotek</h3>
-    <p style="font-size: 12px; color: var(--secondary-text);">Format: Varennavn | Kategori (valgfritt)</p>
+    <h3 style="font-size: 18px;">Rediger bibliotek manuelt</h3>
     <textarea id="importArea"></textarea>
     <div class="btn-group">
         <button class="btn vask-btn" onclick="importerListe()">Lagre endringer</button>
@@ -270,38 +359,36 @@
     let activeItems = JSON.parse(localStorage.getItem('sh_active')) || { handling: [], frys: [], kontor: [], diverse: [] };
     let currentTheme = localStorage.getItem('sh_theme') || 'classic';
 
-    const kategorier = [
-        "Frukt & Grønt",
-        "Kjøtt & Fisk",
-        "Meieriprodukter",
-        "Drikke",
-        "Bakevarer",
-        "Hermetikk & Tørrvarer",
-        "Frysevarer",
-        "Diverse"
-    ];
+    const kategorier = ["Frukt & Grønt", "Kjøtt & Fisk", "Meieriprodukter", "Drikke", "Bakevarer", "Hermetikk & Tørrvarer", "Frysevarer", "Diverse"];
 
     const kategoriMap = {
-        "melk": "Meieriprodukter", "ost": "Meieriprodukter", "smør": "Meieriprodukter", "yoghurt": "Meieriprodukter", "fløte": "Meieriprodukter",
-        "eple": "Frukt & Grønt", "banan": "Frukt & Grønt", "agurk": "Frukt & Grønt", "tomat": "Frukt & Grønt", "løk": "Frukt & Grønt", "gulrot": "Frukt & Grønt",
-        "brød": "Bakevarer", "rundstykker": "Bakevarer", "knekkebrød": "Bakevarer", "mel": "Bakevarer", "gjær": "Bakevarer",
-        "kjøttdeig": "Kjøtt & Fisk", "kylling": "Kjøtt & Fisk", "laks": "Kjøtt & Fisk", "pølser": "Kjøtt & Fisk", "skinke": "Kjøtt & Fisk",
-        "brus": "Drikke", "juice": "Drikke", "vann": "Drikke", "kaffe": "Drikke", "te": "Drikke",
-        "pasta": "Hermetikk & Tørrvarer", "ris": "Hermetikk & Tørrvarer", "boks": "Hermetikk & Tørrvarer", "suppe": "Hermetikk & Tørrvarer"
+        "melk": "Meieriprodukter", "ost": "Meieriprodukter", "smør": "Meieriprodukter", "yoghurt": "Meieriprodukter",
+        "eple": "Frukt & Grønt", "banan": "Frukt & Grønt", "agurk": "Frukt & Grønt",
+        "brød": "Bakevarer", "kjøttdeig": "Kjøtt & Fisk", "kylling": "Kjøtt & Fisk",
+        "brus": "Drikke", "pasta": "Hermetikk & Tørrvarer"
     };
 
-    // Fyll kategori-dropdown
-    const catSelect = document.getElementById('newCategorySelect');
-    kategorier.forEach(cat => {
-        let opt = document.createElement('option');
-        opt.value = cat;
-        opt.innerHTML = cat;
-        catSelect.appendChild(opt);
-    });
+    function init() {
+        const catSelect = document.getElementById('newCategorySelect');
+        catSelect.innerHTML = "";
+        kategorier.forEach(cat => {
+            let opt = document.createElement('option');
+            opt.value = cat; opt.innerHTML = cat;
+            catSelect.appendChild(opt);
+        });
 
-    if (database.frys.length === 0 && database.hjem.length > 0) {
-        database.frys = [...database.hjem];
-        saveData();
+        const modalCatList = document.getElementById('modalCatList');
+        modalCatList.innerHTML = "";
+        kategorier.forEach(cat => {
+            let div = document.createElement('div');
+            div.className = 'cat-option';
+            div.innerText = cat;
+            div.onclick = () => updateItemCategory(cat);
+            modalCatList.appendChild(div);
+        });
+
+        setTheme(currentTheme);
+        render();
     }
 
     function setTheme(theme) {
@@ -309,57 +396,49 @@
         currentTheme = theme;
         localStorage.setItem('sh_theme', theme);
     }
-    setTheme(currentTheme);
 
     function saveData() {
         localStorage.setItem('sh_database', JSON.stringify(database));
         localStorage.setItem('sh_active', JSON.stringify(activeItems));
     }
 
+    function getDbKey() {
+        if (currentTab === 'frys') return 'frys';
+        if (currentTab === 'kontor') return 'kontor';
+        if (currentTab === 'diverse') return 'diverse';
+        return 'hjem';
+    }
+
     function switchTab(tab) {
         currentTab = tab;
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
         document.getElementById('btn-' + tab).classList.add('active');
-        
         const emojis = { handling: '🛒', frys: '❄️', kontor: '📎', diverse: '🛍️' };
         const titles = { handling: 'Handling', frys: 'Frys', kontor: 'Kontor', diverse: 'Diverse' };
         document.getElementById('title').innerText = `${titles[tab]} ${emojis[tab]}`;
         document.getElementById('active-list-header').innerText = tab === 'frys' ? 'Dette er i frysen' : 'Dette skal vi ha';
-        
-        // Skjul kategorivelger hvis vi ikke er i handling
-        document.getElementById('category-selector-container').style.display = 'none';
-        
         clearSearchInput();
-        render();
     }
 
     function suggestCategory() {
         if (currentTab !== 'handling') return;
         const val = document.getElementById('newItemInput').value.toLowerCase().trim();
         const container = document.getElementById('category-selector-container');
-        
         if (val.length > 1) {
             container.style.display = 'block';
             for (let key in kategoriMap) {
-                if (val.includes(key)) {
-                    document.getElementById('newCategorySelect').value = kategoriMap[key];
-                    break;
-                }
+                if (val.includes(key)) { document.getElementById('newCategorySelect').value = kategoriMap[key]; break; }
             }
-        } else {
-            container.style.display = 'none';
-        }
+        } else { container.style.display = 'none'; }
     }
 
     function handleSearchInput(e) {
-        const input = document.getElementById('searchInput');
-        document.getElementById('clearSearch').style.display = input.value.length > 0 ? 'block' : 'none';
+        document.getElementById('clearSearch').style.display = e.target.value.length > 0 ? 'block' : 'none';
         render();
     }
 
     function clearSearchInput() {
-        const input = document.getElementById('searchInput');
-        input.value = "";
+        document.getElementById('searchInput').value = "";
         document.getElementById('clearSearch').style.display = 'none';
         render();
     }
@@ -373,19 +452,7 @@
         }
     }
 
-    function getDbKey() {
-        if (currentTab === 'frys') return 'frys';
-        if (currentTab === 'kontor') return 'kontor';
-        if (currentTab === 'diverse') return 'diverse';
-        return 'hjem';
-    }
-
-    function handleKeyPress(e) {
-        if (e.key === 'Enter') {
-            leggTilNyVare();
-            document.activeElement.blur();
-        }
-    }
+    function handleKeyPress(e) { if (e.key === 'Enter') { leggTilNyVare(); document.activeElement.blur(); } }
 
     function getDatoStreng() {
         const d = new Date();
@@ -396,79 +463,119 @@
     function leggTilNyVare() {
         const input = document.getElementById('newItemInput');
         const navn = input.value.trim();
-        if (navn === "") return;
-        
+        if (!navn) return;
         const dbKey = getDbKey();
         const valgtKategori = currentTab === 'handling' ? document.getElementById('newCategorySelect').value : null;
-        
-        // Finn eller opprett i database
         let dbVare = database[dbKey].find(v => v.navn.toLowerCase() === navn.toLowerCase());
         if (!dbVare) {
             dbVare = { navn: navn, kategori: valgtKategori };
             database[dbKey].push(dbVare);
             database[dbKey].sort((a, b) => a.navn.localeCompare(b.navn, 'nb'));
-        } else if (valgtKategori) {
-            dbVare.kategori = valgtKategori; // Oppdater kategori hvis endret
-        }
-        
+        } else if (valgtKategori) { dbVare.kategori = valgtKategori; }
         if (!activeItems[currentTab].some(v => v.navn.toLowerCase() === navn.toLowerCase())) {
-            const mengde = currentTab === 'frys' ? getDatoStreng() : "";
-            activeItems[currentTab].push({ navn: dbVare.navn, mengde: mengde, kategori: dbVare.kategori });
+            activeItems[currentTab].push({ navn: dbVare.navn, mengde: currentTab === 'frys' ? getDatoStreng() : "", kategori: dbVare.kategori });
         }
-        
-        input.value = "";
-        document.getElementById('category-selector-container').style.display = 'none';
-        saveData();
-        render();
+        input.value = ""; render(); saveData();
     }
 
-    function importerListe() {
-        const input = document.getElementById('importArea').value;
-        const lines = input.split('\n').filter(l => l.trim() !== "");
+    function slettFraBibliotek(navn) {
         const dbKey = getDbKey();
-        
-        database[dbKey] = lines.map(l => {
-            const parts = l.split('|');
-            return { 
-                navn: parts[0].trim(), 
-                kategori: parts[1] ? parts[1].trim() : (currentTab === 'handling' ? "Diverse" : null)
-            };
-        });
-        database[dbKey].sort((a, b) => a.navn.localeCompare(b.navn, 'nb'));
-        saveData();
-        render();
+        database[dbKey] = database[dbKey].filter(v => v.navn !== navn);
+        saveData(); render();
     }
 
     function addToActive(navn) {
         const dbKey = getDbKey();
         const dbVare = database[dbKey].find(v => v.navn === navn);
-        const mengde = currentTab === 'frys' ? getDatoStreng() : "";
-        
-        activeItems[currentTab].push({ 
-            navn: navn, 
-            mengde: mengde, 
-            kategori: dbVare ? dbVare.kategori : (currentTab === 'handling' ? "Diverse" : null) 
-        });
-        saveData();
-        render();
+        if (!activeItems[currentTab].some(v => v.navn === navn)) {
+            activeItems[currentTab].push({ navn: navn, mengde: currentTab === 'frys' ? getDatoStreng() : "", kategori: dbVare ? dbVare.kategori : null });
+            saveData(); render();
+        }
     }
 
-    function updateQuantity(index, value) {
-        activeItems[currentTab][index].mengde = value;
-        saveData();
+    function removeFromActive(index) { activeItems[currentTab].splice(index, 1); saveData(); render(); }
+    function updateQuantity(index, val) { activeItems[currentTab][index].mengde = val; saveData(); }
+    function clearActiveList() { if(confirm("Tømme listen?")) { activeItems[currentTab] = []; saveData(); render(); } }
+
+    // LONG PRESS LOGIKK
+    let longPressTimer;
+    let selectedItemForCat = null;
+
+    function startLongPress(navn) {
+        longPressTimer = setTimeout(() => {
+            openCatModal(navn);
+        }, 600);
     }
 
-    function removeFromActive(index) {
-        activeItems[currentTab].splice(index, 1);
-        saveData();
-        render();
+    function cancelLongPress() {
+        clearTimeout(longPressTimer);
     }
 
-    function clearActiveList() {
-        if(confirm("Tømme listen?")) {
-            activeItems[currentTab] = [];
+    function openCatModal(navn) {
+        selectedItemForCat = navn;
+        document.getElementById('catModal').style.display = 'flex';
+    }
+
+    function closeCatModal() {
+        document.getElementById('catModal').style.display = 'none';
+        selectedItemForCat = null;
+    }
+
+    function updateItemCategory(newCat) {
+        if (!selectedItemForCat) return;
+        const dbKey = getDbKey();
+        const item = database[dbKey].find(v => v.navn === selectedItemForCat);
+        if (item) {
+            item.kategori = newCat;
+            // Oppdater også i aktiv liste hvis den finnes der
+            activeItems[currentTab].forEach(ai => {
+                if (ai.navn === selectedItemForCat) ai.kategori = newCat;
+            });
             saveData();
             render();
+        }
+        closeCatModal();
+    }
+
+    function importerListe() {
+        const input = document.getElementById('importArea').value;
+        const dbKey = getDbKey();
+        database[dbKey] = input.split('\n').filter(l => l.trim()).map(l => {
+            const p = l.split('|');
+            return { navn: p[0].trim(), kategori: p[1] ? p[1].trim() : (currentTab === 'handling' ? "Diverse" : null) };
+        });
+        database[dbKey].sort((a, b) => a.navn.localeCompare(b.navn, 'nb'));
+        saveData(); render();
+    }
+
+    // SWIPE LOGIKK
+    let touchStartX = 0;
+    let currentSwipedElement = null;
+
+    function handleTouchStart(e, content, navn) {
+        if (currentSwipedElement && currentSwipedElement !== content) { currentSwipedElement.style.transform = 'translateX(0px)'; }
+        touchStartX = e.touches[0].clientX;
+        currentSwipedElement = content;
+        content.style.transition = 'none';
+        startLongPress(navn);
+    }
+
+    function handleTouchMove(e, content) {
+        let diff = e.touches[0].clientX - touchStartX;
+        if (Math.abs(diff) > 10) cancelLongPress(); // Avbryt longpress hvis man begynner å swipe
+        if (diff < 0) diff = 0;
+        if (diff > 80) diff = 80;
+        content.style.transform = `translateX(${diff}px)`;
+    }
+
+    function handleTouchEnd(e, content, navn) {
+        cancelLongPress();
+        content.style.transition = 'transform 0.2s ease-out';
+        let diff = e.changedTouches[0].clientX - touchStartX;
+        if (diff > 40) { content.style.transform = 'translateX(80px)'; } 
+        else { 
+            content.style.transform = 'translateX(0px)';
+            if (Math.abs(diff) < 5) addToActive(navn);
         }
     }
 
@@ -477,72 +584,66 @@
         const libraryDiv = document.getElementById('libraryList');
         const search = document.getElementById('searchInput').value.toLowerCase();
         const dbKey = getDbKey();
-        const db = database[dbKey];
         const currentActive = [...activeItems[currentTab]];
 
-        // Sortering for Aktiv Liste
+        // Sorter aktiv liste basert på kategori (kun i handling)
         if (currentTab === 'handling') {
-            // Sorter etter kategori først, så navn
             currentActive.sort((a, b) => {
-                const catA = a.kategori || "Diverse";
-                const catB = b.kategori || "Diverse";
-                if (catA !== catB) return kategorier.indexOf(catA) - kategorier.indexOf(catB);
+                const catA = a.kategori || "Diverse", catB = b.kategori || "Diverse";
+                const indexA = kategorier.indexOf(catA);
+                const indexB = kategorier.indexOf(catB);
+                if (indexA !== indexB) return indexA - indexB;
                 return a.navn.localeCompare(b.navn, 'nb');
             });
         }
 
-        let activeHtml = "";
-        let lastCat = null;
-
-        if (currentActive.length === 0) {
-            activeHtml = '<div style="padding:15px; color:var(--secondary-text); font-size:12px; text-align:center;">Listen er tom</div>';
-        } else {
-            currentActive.forEach((v) => {
-                // Legg til kategori-overskrift i handlelisten
-                if (currentTab === 'handling' && (v.kategori || "Diverse") !== lastCat) {
-                    lastCat = v.kategori || "Diverse";
-                    activeHtml += `<div class="category-header">${lastCat}</div>`;
-                }
-                
-                // Finn original index for sletting (siden vi sorterte kopien)
-                const origIdx = activeItems[currentTab].findIndex(item => item.navn === v.navn);
-
-                activeHtml += `
-                    <div class="item item-active" onclick="removeFromActive(${origIdx})">
-                        <div style="display: flex; align-items: center; flex: 1;">
-                            <span style="margin-right: 10px;">⭐</span>
-                            <span style="word-break: break-word; padding-right: 5px;">${v.navn}</span>
-                        </div>
-                        <div style="display: flex; align-items: center;" onclick="event.stopPropagation()">
-                            <input type="text" 
-                                   class="qty-input" 
-                                   placeholder="${currentTab === 'frys' ? 'Dato' : 'Mengde'}" 
-                                   value="${v.mengde || ''}" 
-                                   oninput="updateQuantity(${origIdx}, this.value)"
-                                   onkeypress="if(event.key==='Enter') this.blur()">
-                        </div>
+        let activeHtml = ""; let lastCat = null;
+        if (currentActive.length === 0) activeHtml = '<div style="padding:20px; text-align:center; color:gray; font-size:12px;">Ingen aktive varer</div>';
+        currentActive.forEach(v => {
+            if (currentTab === 'handling' && (v.kategori || "Diverse") !== lastCat) {
+                lastCat = v.kategori || "Diverse";
+                activeHtml += `<div class="category-header">${lastCat}</div>`;
+            }
+            const origIdx = activeItems[currentTab].findIndex(item => item.navn === v.navn);
+            activeHtml += `
+                <div class="swipe-content item-active" style="border-bottom: 0.5px solid var(--divider)" onclick="removeFromActive(${origIdx})">
+                    <div style="flex:1">⭐ ${v.navn}</div>
+                    <div onclick="event.stopPropagation()">
+                        <input type="text" class="qty-input" placeholder="${currentTab === 'frys' ? 'Dato' : 'Mengde'}" value="${v.mengde || ''}" oninput="updateQuantity(${origIdx}, this.value)" inputmode="text">
                     </div>
-                `;
-            });
-        }
+                </div>`;
+        });
         activeDiv.innerHTML = activeHtml;
 
-        const filteredLibrary = db.filter(v => {
-            const matchesSearch = v.navn.toLowerCase().includes(search);
-            const isAlreadyInTab = activeItems[currentTab].some(active => active.navn === v.navn);
-            return matchesSearch && !isAlreadyInTab;
+        const filteredLib = database[dbKey].filter(v => v.navn.toLowerCase().includes(search) && !activeItems[currentTab].some(a => a.navn === v.navn));
+        libraryDiv.innerHTML = "";
+        filteredLib.forEach(v => {
+            const container = document.createElement('div'); container.className = 'swipe-container';
+            const delBtn = document.createElement('div'); delBtn.className = 'delete-btn-ios'; delBtn.innerText = 'SLETT';
+            delBtn.onclick = (e) => { e.stopPropagation(); slettFraBibliotek(v.navn); };
+            
+            const content = document.createElement('div'); content.className = 'swipe-content';
+            content.innerHTML = `
+                <div style="display:flex; flex-direction:column; overflow:hidden;">
+                    <span style="text-overflow:ellipsis; overflow:hidden; white-space:nowrap">+ ${v.navn}</span>
+                    <span style="font-size:8px; color:var(--secondary-text)">${v.kategori || 'Ingen kat.'}</span>
+                </div>
+                <span style="color:var(--primary)">⊕</span>`;
+            
+            content.ontouchstart = (e) => handleTouchStart(e, content, v.navn);
+            content.ontouchmove = (e) => handleTouchMove(e, content);
+            content.ontouchend = (e) => handleTouchEnd(e, content, v.navn);
+            content.onmousedown = () => startLongPress(v.navn); // For desktop-testing
+            content.onmouseup = () => cancelLongPress();
+            content.onmouseleave = () => cancelLongPress();
+            
+            content.onclick = () => { if (content.style.transform === 'translateX(80px)') content.style.transform = 'translateX(0px)'; else addToActive(v.navn); };
+            
+            container.appendChild(delBtn); container.appendChild(content); libraryDiv.appendChild(container);
         });
-
-        libraryDiv.innerHTML = filteredLibrary.length ? filteredLibrary.map(v => `
-            <div class="item" onclick="addToActive('${v.navn.replace(/'/g, "\\'")}')">
-                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80%;">+ ${v.navn}</span>
-                <span style="color: var(--primary); font-size: 16px;">⊕</span>
-            </div>
-        `).join('') : '<div style="padding:15px; color:var(--secondary-text); font-size:12px; text-align:center; grid-column: 1/3;">Fant ingenting</div>';
     }
 
-    render();
+    init();
 </script>
-
 </body>
 </html>
