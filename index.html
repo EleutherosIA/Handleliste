@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-title" content="Min Liste">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3737/3737372.png">
 
-    <title>Kompakt Handleliste - Mengde-utgave</title>
+    <title>Kompakt Handleliste - Smart Sortering</title>
     
     <style>
         /* Fargetemaer */
@@ -75,12 +75,37 @@
             display: flex; flex-direction: column; gap: 8px; 
         }
 
-        .input-group { display: flex; gap: 6px; }
+        .input-group { display: flex; gap: 6px; position: relative; }
 
-        input { 
-            flex: 1; padding: 10px 12px; border-radius: 12px; border: none; 
+        input, select { 
+            padding: 10px 12px; border-radius: 12px; border: none; 
             background: var(--input-bg); font-size: 14px; color: var(--text);
             outline: none;
+        }
+
+        input { flex: 1; }
+
+        .category-select-mini {
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 8px;
+            background: var(--input-bg);
+            border: 1px solid var(--divider);
+            color: var(--secondary-text);
+            margin-bottom: 4px;
+        }
+
+        .search-container { position: relative; display: flex; align-items: center; }
+        
+        .clear-btn {
+            position: absolute;
+            right: 12px;
+            font-size: 14px;
+            color: var(--secondary-text);
+            cursor: pointer;
+            display: none; 
+            padding: 5px;
+            user-select: none;
         }
 
         .add-btn { 
@@ -93,6 +118,15 @@
         h2 { 
             font-size: 11px; color: var(--secondary-text); text-transform: uppercase; 
             letter-spacing: 0.8px; margin: 12px 0 6px 4px; 
+        }
+
+        .category-header {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--primary);
+            padding: 8px 12px 4px 12px;
+            background: var(--bg);
+            text-transform: uppercase;
         }
 
         .list-container { 
@@ -109,9 +143,8 @@
         .item:active { background-color: var(--input-bg); }
         .item-active { color: var(--primary); font-weight: 600; }
 
-        /* Stil for mengde-input */
         .qty-input {
-            width: 65px;
+            width: 75px; /* Litt bredere for tekst som "500g" */
             padding: 6px 4px;
             border-radius: 8px;
             border: 1px solid var(--divider);
@@ -119,14 +152,8 @@
             color: var(--text);
             font-size: 13px;
             text-align: center;
-            margin-right: 4px; /* Litt mindre margin nå som OK er borte */
+            margin-right: 4px;
             font-weight: 500;
-        }
-
-        .qty-input:focus {
-            border-color: var(--primary);
-            background: var(--card);
-            box-shadow: 0 0 0 2px rgba(74, 124, 89, 0.1);
         }
 
         #libraryList {
@@ -156,14 +183,6 @@
             display: flex; flex-direction: column;
         }
         #admin-panel.open { bottom: 0; }
-        
-        .theme-selector {
-            display: flex; gap: 10px; margin-bottom: 20px;
-        }
-        .theme-dot {
-            width: 40px; height: 40px; border-radius: 50%; border: 3px solid white;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer;
-        }
 
         textarea { 
             width: 100%; flex: 1; margin-bottom: 15px; padding: 15px; border: none; 
@@ -183,16 +202,28 @@
 </header>
 
 <div class="top-controls">
-    <div class="input-group">
-        <input type="text" id="newItemInput" placeholder="Hva mangler?" onkeypress="handleKeyPress(event)" inputmode="text">
-        <button class="add-btn" onclick="leggTilNyVare()">Legg til</button>
+    <div id="add-section">
+        <div class="input-group">
+            <input type="text" id="newItemInput" placeholder="Hva mangler?" onkeypress="handleKeyPress(event)" oninput="suggestCategory()" inputmode="text">
+            <button class="add-btn" onclick="leggTilNyVare()">Legg til</button>
+        </div>
+        <div id="category-selector-container" style="display:none; margin-top: 4px;">
+            <select id="newCategorySelect" class="category-select-mini">
+                <!-- Fylles av JS -->
+            </select>
+            <span style="font-size: 10px; color: var(--secondary-text); margin-left: 5px;">Kategori</span>
+        </div>
     </div>
-    <input type="text" id="searchInput" placeholder="Søk i bibliotek..." onkeyup="render()" inputmode="search">
+    
+    <div class="search-container">
+        <input type="text" id="searchInput" placeholder="Søk i bibliotek..." onkeyup="handleSearchInput(event)" inputmode="search">
+        <span id="clearSearch" class="clear-btn" onclick="clearSearchInput()">✕</span>
+    </div>
 </div>
 
 <main>
     <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h2>Dette skal vi ha</h2>
+        <h2 id="active-list-header">Dette skal vi ha</h2>
         <button onclick="clearActiveList()" style="background:none; border:none; color:var(--red); font-size: 10px; cursor:pointer;">Tøm fane</button>
     </div>
     <div id="activeList" class="list-container"></div>
@@ -218,13 +249,14 @@
 
 <div id="admin-panel">
     <h3 style="margin-top:0; font-size: 18px;">Velg tema</h3>
-    <div class="theme-selector">
-        <div class="theme-dot" style="background: #4a7c59;" onclick="setTheme('classic')"></div>
-        <div class="theme-dot" style="background: #2c2c2c;" onclick="setTheme('dark')"></div>
-        <div class="theme-dot" style="background: #d63384;" onclick="setTheme('pink')"></div>
+    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+        <div style="width: 40px; height: 40px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer; background: #4a7c59;" onclick="setTheme('classic')"></div>
+        <div style="width: 40px; height: 40px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer; background: #2c2c2c;" onclick="setTheme('dark')"></div>
+        <div style="width: 40px; height: 40px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer; background: #d63384;" onclick="setTheme('pink')"></div>
     </div>
 
     <h3 style="font-size: 18px;">Rediger bibliotek</h3>
+    <p style="font-size: 12px; color: var(--secondary-text);">Format: Varennavn | Kategori (valgfritt)</p>
     <textarea id="importArea"></textarea>
     <div class="btn-group">
         <button class="btn vask-btn" onclick="importerListe()">Lagre endringer</button>
@@ -234,16 +266,49 @@
 
 <script>
     let currentTab = 'handling';
-    let database = JSON.parse(localStorage.getItem('sh_database')) || { hjem: [], kontor: [], diverse: [] };
+    let database = JSON.parse(localStorage.getItem('sh_database')) || { hjem: [], frys: [], kontor: [], diverse: [] };
     let activeItems = JSON.parse(localStorage.getItem('sh_active')) || { handling: [], frys: [], kontor: [], diverse: [] };
     let currentTheme = localStorage.getItem('sh_theme') || 'classic';
+
+    const kategorier = [
+        "Frukt & Grønt",
+        "Kjøtt & Fisk",
+        "Meieriprodukter",
+        "Drikke",
+        "Bakevarer",
+        "Hermetikk & Tørrvarer",
+        "Frysevarer",
+        "Diverse"
+    ];
+
+    const kategoriMap = {
+        "melk": "Meieriprodukter", "ost": "Meieriprodukter", "smør": "Meieriprodukter", "yoghurt": "Meieriprodukter", "fløte": "Meieriprodukter",
+        "eple": "Frukt & Grønt", "banan": "Frukt & Grønt", "agurk": "Frukt & Grønt", "tomat": "Frukt & Grønt", "løk": "Frukt & Grønt", "gulrot": "Frukt & Grønt",
+        "brød": "Bakevarer", "rundstykker": "Bakevarer", "knekkebrød": "Bakevarer", "mel": "Bakevarer", "gjær": "Bakevarer",
+        "kjøttdeig": "Kjøtt & Fisk", "kylling": "Kjøtt & Fisk", "laks": "Kjøtt & Fisk", "pølser": "Kjøtt & Fisk", "skinke": "Kjøtt & Fisk",
+        "brus": "Drikke", "juice": "Drikke", "vann": "Drikke", "kaffe": "Drikke", "te": "Drikke",
+        "pasta": "Hermetikk & Tørrvarer", "ris": "Hermetikk & Tørrvarer", "boks": "Hermetikk & Tørrvarer", "suppe": "Hermetikk & Tørrvarer"
+    };
+
+    // Fyll kategori-dropdown
+    const catSelect = document.getElementById('newCategorySelect');
+    kategorier.forEach(cat => {
+        let opt = document.createElement('option');
+        opt.value = cat;
+        opt.innerHTML = cat;
+        catSelect.appendChild(opt);
+    });
+
+    if (database.frys.length === 0 && database.hjem.length > 0) {
+        database.frys = [...database.hjem];
+        saveData();
+    }
 
     function setTheme(theme) {
         document.body.setAttribute('data-theme', theme);
         currentTheme = theme;
         localStorage.setItem('sh_theme', theme);
     }
-
     setTheme(currentTheme);
 
     function saveData() {
@@ -259,6 +324,43 @@
         const emojis = { handling: '🛒', frys: '❄️', kontor: '📎', diverse: '🛍️' };
         const titles = { handling: 'Handling', frys: 'Frys', kontor: 'Kontor', diverse: 'Diverse' };
         document.getElementById('title').innerText = `${titles[tab]} ${emojis[tab]}`;
+        document.getElementById('active-list-header').innerText = tab === 'frys' ? 'Dette er i frysen' : 'Dette skal vi ha';
+        
+        // Skjul kategorivelger hvis vi ikke er i handling
+        document.getElementById('category-selector-container').style.display = 'none';
+        
+        clearSearchInput();
+        render();
+    }
+
+    function suggestCategory() {
+        if (currentTab !== 'handling') return;
+        const val = document.getElementById('newItemInput').value.toLowerCase().trim();
+        const container = document.getElementById('category-selector-container');
+        
+        if (val.length > 1) {
+            container.style.display = 'block';
+            for (let key in kategoriMap) {
+                if (val.includes(key)) {
+                    document.getElementById('newCategorySelect').value = kategoriMap[key];
+                    break;
+                }
+            }
+        } else {
+            container.style.display = 'none';
+        }
+    }
+
+    function handleSearchInput(e) {
+        const input = document.getElementById('searchInput');
+        document.getElementById('clearSearch').style.display = input.value.length > 0 ? 'block' : 'none';
+        render();
+    }
+
+    function clearSearchInput() {
+        const input = document.getElementById('searchInput');
+        input.value = "";
+        document.getElementById('clearSearch').style.display = 'none';
         render();
     }
 
@@ -267,11 +369,12 @@
         panel.classList.toggle('open'); 
         if(panel.classList.contains('open')) {
             const dbKey = getDbKey();
-            document.getElementById('importArea').value = database[dbKey].map(v => v.navn).join('\n');
+            document.getElementById('importArea').value = database[dbKey].map(v => `${v.navn}${v.kategori ? ' | ' + v.kategori : ''}`).join('\n');
         }
     }
 
     function getDbKey() {
+        if (currentTab === 'frys') return 'frys';
         if (currentTab === 'kontor') return 'kontor';
         if (currentTab === 'diverse') return 'diverse';
         return 'hjem';
@@ -284,21 +387,37 @@
         }
     }
 
+    function getDatoStreng() {
+        const d = new Date();
+        const mnd = ["jan", "feb", "mar", "apr", "mai", "jun", "jul", "aug", "sep", "okt", "nov", "des"];
+        return `${d.getDate()}. ${mnd[d.getMonth()]}`;
+    }
+
     function leggTilNyVare() {
         const input = document.getElementById('newItemInput');
         const navn = input.value.trim();
         if (navn === "") return;
         
         const dbKey = getDbKey();
+        const valgtKategori = currentTab === 'handling' ? document.getElementById('newCategorySelect').value : null;
         
-        if (!database[dbKey].some(v => v.navn.toLowerCase() === navn.toLowerCase())) {
-            database[dbKey].push({ navn: navn });
+        // Finn eller opprett i database
+        let dbVare = database[dbKey].find(v => v.navn.toLowerCase() === navn.toLowerCase());
+        if (!dbVare) {
+            dbVare = { navn: navn, kategori: valgtKategori };
+            database[dbKey].push(dbVare);
             database[dbKey].sort((a, b) => a.navn.localeCompare(b.navn, 'nb'));
+        } else if (valgtKategori) {
+            dbVare.kategori = valgtKategori; // Oppdater kategori hvis endret
         }
+        
         if (!activeItems[currentTab].some(v => v.navn.toLowerCase() === navn.toLowerCase())) {
-            activeItems[currentTab].push({ navn: navn, mengde: "" });
+            const mengde = currentTab === 'frys' ? getDatoStreng() : "";
+            activeItems[currentTab].push({ navn: dbVare.navn, mengde: mengde, kategori: dbVare.kategori });
         }
+        
         input.value = "";
+        document.getElementById('category-selector-container').style.display = 'none';
         saveData();
         render();
     }
@@ -306,17 +425,30 @@
     function importerListe() {
         const input = document.getElementById('importArea').value;
         const lines = input.split('\n').filter(l => l.trim() !== "");
-        const newItems = lines.map(l => ({ navn: l.trim() }));
         const dbKey = getDbKey();
         
-        database[dbKey] = newItems;
+        database[dbKey] = lines.map(l => {
+            const parts = l.split('|');
+            return { 
+                navn: parts[0].trim(), 
+                kategori: parts[1] ? parts[1].trim() : (currentTab === 'handling' ? "Diverse" : null)
+            };
+        });
         database[dbKey].sort((a, b) => a.navn.localeCompare(b.navn, 'nb'));
         saveData();
         render();
     }
 
     function addToActive(navn) {
-        activeItems[currentTab].push({ navn: navn, mengde: "" });
+        const dbKey = getDbKey();
+        const dbVare = database[dbKey].find(v => v.navn === navn);
+        const mengde = currentTab === 'frys' ? getDatoStreng() : "";
+        
+        activeItems[currentTab].push({ 
+            navn: navn, 
+            mengde: mengde, 
+            kategori: dbVare ? dbVare.kategori : (currentTab === 'handling' ? "Diverse" : null) 
+        });
         saveData();
         render();
     }
@@ -344,32 +476,60 @@
         const activeDiv = document.getElementById('activeList');
         const libraryDiv = document.getElementById('libraryList');
         const search = document.getElementById('searchInput').value.toLowerCase();
-        
         const dbKey = getDbKey();
         const db = database[dbKey];
-        const currentActive = activeItems[currentTab];
+        const currentActive = [...activeItems[currentTab]];
 
-        activeDiv.innerHTML = currentActive.length ? currentActive.map((v, i) => `
-            <div class="item item-active" onclick="removeFromActive(${i})">
-                <div style="display: flex; align-items: center; flex: 1;">
-                    <span style="margin-right: 10px;">⭐</span>
-                    <span>${v.navn}</span>
-                </div>
-                <div style="display: flex; align-items: center;" onclick="event.stopPropagation()">
-                    <input type="text" 
-                           class="qty-input" 
-                           placeholder="Ant" 
-                           inputmode="decimal"
-                           value="${v.mengde || ''}" 
-                           oninput="updateQuantity(${i}, this.value)"
-                           onkeypress="if(event.key==='Enter') this.blur()">
-                </div>
-            </div>
-        `).join('') : '<div style="padding:15px; color:var(--secondary-text); font-size:12px; text-align:center;">Listen er tom</div>';
+        // Sortering for Aktiv Liste
+        if (currentTab === 'handling') {
+            // Sorter etter kategori først, så navn
+            currentActive.sort((a, b) => {
+                const catA = a.kategori || "Diverse";
+                const catB = b.kategori || "Diverse";
+                if (catA !== catB) return kategorier.indexOf(catA) - kategorier.indexOf(catB);
+                return a.navn.localeCompare(b.navn, 'nb');
+            });
+        }
+
+        let activeHtml = "";
+        let lastCat = null;
+
+        if (currentActive.length === 0) {
+            activeHtml = '<div style="padding:15px; color:var(--secondary-text); font-size:12px; text-align:center;">Listen er tom</div>';
+        } else {
+            currentActive.forEach((v) => {
+                // Legg til kategori-overskrift i handlelisten
+                if (currentTab === 'handling' && (v.kategori || "Diverse") !== lastCat) {
+                    lastCat = v.kategori || "Diverse";
+                    activeHtml += `<div class="category-header">${lastCat}</div>`;
+                }
+                
+                // Finn original index for sletting (siden vi sorterte kopien)
+                const origIdx = activeItems[currentTab].findIndex(item => item.navn === v.navn);
+
+                activeHtml += `
+                    <div class="item item-active" onclick="removeFromActive(${origIdx})">
+                        <div style="display: flex; align-items: center; flex: 1;">
+                            <span style="margin-right: 10px;">⭐</span>
+                            <span style="word-break: break-word; padding-right: 5px;">${v.navn}</span>
+                        </div>
+                        <div style="display: flex; align-items: center;" onclick="event.stopPropagation()">
+                            <input type="text" 
+                                   class="qty-input" 
+                                   placeholder="${currentTab === 'frys' ? 'Dato' : 'Mengde'}" 
+                                   value="${v.mengde || ''}" 
+                                   oninput="updateQuantity(${origIdx}, this.value)"
+                                   onkeypress="if(event.key==='Enter') this.blur()">
+                        </div>
+                    </div>
+                `;
+            });
+        }
+        activeDiv.innerHTML = activeHtml;
 
         const filteredLibrary = db.filter(v => {
             const matchesSearch = v.navn.toLowerCase().includes(search);
-            const isAlreadyInTab = currentActive.some(active => active.navn === v.navn);
+            const isAlreadyInTab = activeItems[currentTab].some(active => active.navn === v.navn);
             return matchesSearch && !isAlreadyInTab;
         });
 
